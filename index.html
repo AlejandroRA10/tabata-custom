@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Intervalos · Tábata Air Bike</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0e1116">
+<meta name="description" content="Temporizador de intervalos Tábata para Air Bike, con perfiles guardados.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Intervalos">
+<link rel="icon" href="icon-32.png" sizes="32x32">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  :root{
+    --bg:#0e1116; --card:#171b22; --card2:#1e232c; --line:#2a3039;
+    --txt:#e8edf4; --muted:#8b95a5; --acc:#ff5c33;
+    --work:#ff3b30; --rest:#22c1a4; --prep:#f5a623; --long:#3b82f6; --done:#7c5cff;
+    --fase:var(--prep);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--txt); min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:16px; padding-bottom:40px;
+    padding-top:calc(16px + env(safe-area-inset-top));
+    transition:background .35s ease;
+  }
+  body.corriendo{
+    background:
+      radial-gradient(120% 80% at 50% 0%, color-mix(in srgb, var(--fase) 26%, transparent) 0%, transparent 60%),
+      var(--bg);
+  }
+  .wrap{max-width:760px;margin:0 auto}
+
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  h1{font-size:17px;margin:0;letter-spacing:.02em;font-weight:650}
+  h1 span{color:var(--acc)}
+  .sub{font-size:12px;color:var(--muted);margin-top:2px}
+
+  /* ---------- Pantalla de timer ---------- */
+  .timer{
+    background:var(--card); border:1px solid var(--line); border-radius:20px;
+    padding:22px 18px 18px; text-align:center; position:relative; overflow:hidden;
+  }
+  .timer::before{
+    content:""; position:absolute; inset:0 0 auto 0; height:4px; background:var(--fase);
+    opacity:.9;
+  }
+  .fase{
+    font-size:clamp(20px,6vw,30px); font-weight:800; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--fase); margin:6px 0 2px;
+  }
+  .reloj{
+    font-variant-numeric:tabular-nums; font-weight:800; line-height:.92;
+    font-size:clamp(76px,26vw,180px); letter-spacing:-.03em; margin:4px 0 6px;
+  }
+  .barra{height:8px;border-radius:99px;background:var(--card2);overflow:hidden;margin:10px 0 16px}
+  .barra i{display:block;height:100%;background:var(--fase);width:0%;border-radius:99px;transition:width .12s linear}
+  .meta{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+  .chip{
+    background:var(--card2); border:1px solid var(--line); border-radius:99px;
+    padding:6px 12px; font-size:13px; color:var(--muted);
+  }
+  .chip b{color:var(--txt);font-variant-numeric:tabular-nums}
+  .prox{font-size:13px;color:var(--muted);min-height:18px;margin-bottom:14px}
+  .prox b{color:var(--txt)}
+
+  .controles{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  button{
+    font:inherit; cursor:pointer; border-radius:12px; border:1px solid var(--line);
+    background:var(--card2); color:var(--txt); padding:12px 18px; font-weight:600;
+    transition:transform .06s ease, background .15s ease, border-color .15s ease;
+  }
+  button:hover{background:#262c37}
+  button:active{transform:translateY(1px)}
+  button.principal{background:var(--acc);border-color:var(--acc);color:#fff;min-width:150px;font-size:17px}
+  button.principal:hover{filter:brightness(1.08);background:var(--acc)}
+  button.chico{padding:9px 13px;font-size:14px;font-weight:500}
+  button.peligro{color:#ff7a6b;border-color:#4a2b2b}
+  button:disabled{opacity:.45;cursor:not-allowed}
+
+  /* ---------- Tarjetas ---------- */
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:18px;
+    padding:16px; margin-top:14px;
+  }
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:0 0 14px;font-weight:650}
+  .fila{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  input[type=number],input[type=text],textarea,select{
+    width:100%; background:var(--bg); color:var(--txt); border:1px solid var(--line);
+    border-radius:11px; padding:11px 12px; font:inherit; font-variant-numeric:tabular-nums;
+  }
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--acc)}
+  textarea{resize:vertical;min-height:60px;font-size:14px}
+  .stepper{display:flex;gap:6px;align-items:stretch}
+  .stepper input{text-align:center}
+  .stepper button{padding:0 14px;font-size:18px;line-height:1;background:var(--card2)}
+  .resumen{
+    margin-top:14px;padding:11px 13px;background:var(--card2);border-radius:11px;
+    font-size:13px;color:var(--muted);border:1px solid var(--line)
+  }
+  .resumen b{color:var(--txt)}
+
+  .perfil-item{
+    display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);
+    border-radius:12px;background:var(--card2);margin-bottom:8px;cursor:pointer;
+  }
+  .perfil-item:hover{border-color:#3b4453}
+  .perfil-item.activo{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,var(--card2))}
+  .perfil-info{flex:1;min-width:0}
+  .perfil-nom{font-weight:650;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .perfil-det{font-size:12px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
+  .perfil-nota{font-size:12px;color:var(--muted);margin-top:4px;font-style:italic;opacity:.9}
+  .vacio{color:var(--muted);font-size:14px;text-align:center;padding:16px}
+
+  .toggle{display:flex;align-items:center;gap:9px;font-size:14px;color:var(--muted);cursor:pointer;user-select:none}
+  .toggle input{width:18px;height:18px;accent-color:var(--acc);cursor:pointer}
+  .aviso{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.5}
+  .oculto{display:none !important}
+  .msg{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:50;
+    background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:11px 18px;
+    font-size:14px;box-shadow:0 8px 30px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:opacity .2s
+  }
+  .msg.ver{opacity:1}
+  @media (max-width:520px){
+    body{padding:10px;padding-bottom:32px;padding-top:calc(10px + env(safe-area-inset-top))}
+    .timer{padding:18px 12px 14px}
+    button.principal{flex:1}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>INTERVALOS <span>· Air Bike</span></h1>
+      <div class="sub" id="perfilActivo">Protocolo Tábata configurable</div>
+    </div>
+    <div class="fila" style="gap:8px">
+      <button class="chico oculto" id="btnInstalar" title="Instalar en la pantalla de inicio">⤓ Instalar</button>
+      <button class="chico" id="btnSonido" title="Activar o silenciar los pitidos">🔊 Sonido</button>
+    </div>
+  </header>
+
+  <!-- TIMER -->
+  <section class="timer">
+    <div class="fase" id="fase">Listo</div>
+    <div class="reloj" id="reloj">00:20</div>
+    <div class="barra"><i id="barra"></i></div>
+    <div class="meta">
+      <div class="chip">Ronda <b id="chipRonda">–</b></div>
+      <div class="chip">Serie <b id="chipSerie">–</b></div>
+      <div class="chip">Restante <b id="chipTotal">–</b></div>
+    </div>
+    <div class="prox" id="prox">Elegí un perfil y tocá Empezar</div>
+    <div class="controles">
+      <button class="principal" id="btnPlay">▶ Empezar</button>
+      <button class="chico" id="btnSaltar">Saltar ⏭</button>
+      <button class="chico" id="btnReset">Reiniciar ↺</button>
+    </div>
+  </section>
+
+  <!-- CONFIGURACIÓN -->
+  <section class="card" id="cardConfig">
+    <h2>Tiempos del entrenamiento</h2>
+    <div class="grid">
+      <div>
+        <label for="prep">Preparación (seg)</label>
+        <div class="stepper">
+          <button class="chico" data-step="-5" data-target="prep">−</button>
+          <input type="number" id="prep" min="0" max="600" step="1" value="10">
+          <button class="chico" data-step="5" data-target="prep">+</button>
+        </div>
+      </div>
+      <div>
+        <label for="trabajo">Trabajo (seg)</label>
+        <div class="stepper">
+          <button class="chico" data-step="-5" data-target="trabajo">−</button>
+          <input type="number" id="trabajo" min="1" max="3600" step="1" value="20">
+          <button class="chico" data-step="5" data-target="trabajo">+</button>
+        </div>
+      </div>
+      <div>
+        <label for="descanso">Descanso (seg)</label>
+        <div class="stepper">
+          <button class="chico" data-step="-5" data-target="descanso">−</button>
+          <input type="number" id="descanso" min="0" max="3600" step="1" value="10">
+          <button class="chico" data-step="5" data-target="descanso">+</button>
+        </div>
+      </div>
+      <div>
+        <label for="rondas">Rondas por serie</label>
+        <div class="stepper">
+          <button class="chico" data-step="-1" data-target="rondas">−</button>
+          <input type="number" id="rondas" min="1" max="99" step="1" value="8">
+          <button class="chico" data-step="1" data-target="rondas">+</button>
+        </div>
+      </div>
+      <div>
+        <label for="series">Series (bloques)</label>
+        <div class="stepper">
+          <button class="chico" data-step="-1" data-target="series">−</button>
+          <input type="number" id="series" min="1" max="20" step="1" value="1">
+          <button class="chico" data-step="1" data-target="series">+</button>
+        </div>
+      </div>
+      <div>
+        <label for="descansoSerie">Descanso entre series (seg)</label>
+        <div class="stepper">
+          <button class="chico" data-step="-15" data-target="descansoSerie">−</button>
+          <input type="number" id="descansoSerie" min="0" max="3600" step="1" value="60">
+          <button class="chico" data-step="15" data-target="descansoSerie">+</button>
+        </div>
+      </div>
+    </div>
+    <div class="resumen" id="resumen"></div>
+    <div class="fila" style="margin-top:12px">
+      <label class="toggle"><input type="checkbox" id="chkPantalla" checked> Mantener la pantalla encendida</label>
+    </div>
+  </section>
+
+  <!-- PERFILES -->
+  <section class="card">
+    <h2>Perfiles guardados</h2>
+    <div id="listaPerfiles"></div>
+
+    <div style="margin-top:14px">
+      <label for="nombrePerfil">Nombre del perfil</label>
+      <input type="text" id="nombrePerfil" placeholder="Ej: Tábata clásico Air Bike" maxlength="60">
+    </div>
+    <div style="margin-top:10px">
+      <label for="notasPerfil">Notas / consigna</label>
+      <textarea id="notasPerfil" placeholder="Ej: brazos y piernas a full, resistencia 4, mantener 70+ RPM" maxlength="300"></textarea>
+    </div>
+    <div class="fila" style="margin-top:12px">
+      <button class="chico" id="btnGuardar">💾 Guardar cambios</button>
+      <button class="chico" id="btnNuevo">＋ Guardar como nuevo</button>
+      <button class="chico peligro" id="btnBorrar">🗑 Borrar</button>
+    </div>
+    <div class="fila" style="margin-top:10px">
+      <button class="chico" id="btnExportar">⤓ Exportar respaldo</button>
+      <button class="chico" id="btnImportar">⤒ Importar respaldo</button>
+      <input type="file" id="fileImport" accept="application/json" class="oculto">
+    </div>
+    <div class="aviso">
+      Los perfiles quedan guardados en este navegador y en esta PC/celular. Si vas a usar la app en el
+      teléfono del gimnasio, exportá el respaldo y importalo allá. Atajos: <b>Espacio</b> empezar/pausar,
+      <b>R</b> reiniciar, <b>S</b> saltar.
+    </div>
+  </section>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+  const CLAVE = "intervalos_airbike_perfiles_v1";
+  const CLAVE_CFG = "intervalos_airbike_cfg_v1";
+
+  const CAMPOS = ["prep","trabajo","descanso","rondas","series","descansoSerie"];
+
+  const COLOR = { prep:"var(--prep)", work:"var(--work)", rest:"var(--rest)", largo:"var(--long)", fin:"var(--done)" };
+  const TITULO = { prep:"Preparate", work:"Trabajo", rest:"Descanso", largo:"Descanso largo", fin:"Terminado" };
+
+  /* ====================== Construcción del plan ====================== */
+  function construirPlan(cfg){
+    const plan = [];
+    const rondas = Math.max(1, cfg.rondas|0);
+    const series = Math.max(1, cfg.series|0);
+    if (cfg.prep > 0) plan.push({tipo:"prep", dur:cfg.prep, ronda:1, serie:1});
+    for (let s = 1; s <= series; s++){
+      for (let r = 1; r <= rondas; r++){
+        plan.push({tipo:"work", dur:cfg.trabajo, ronda:r, serie:s});
+        const ultimaRonda = (r === rondas);
+        if (!ultimaRonda && cfg.descanso > 0){
+          plan.push({tipo:"rest", dur:cfg.descanso, ronda:r, serie:s});
+        }
+      }
+      if (s < series && cfg.descansoSerie > 0){
+        plan.push({tipo:"largo", dur:cfg.descansoSerie, ronda:rondas, serie:s});
+      }
+    }
+    return plan;
+  }
+  const duracionTotal = plan => plan.reduce((a,s)=>a+s.dur, 0);
+
+  /* ====================== Estado ====================== */
+  let plan = [], idx = 0, restante = 0, corriendo = false, finAbs = 0;
+  let tick = null, ultimoBeep = -1, sonido = true, wakeLock = null;
+  let perfiles = [], perfilActivoId = null;
+
+  /* ====================== Audio ====================== */
+  let ctx = null;
+  function audio(){
+    if (!ctx){ const AC = window.AudioContext || window.webkitAudioContext; if (AC) ctx = new AC(); }
+    if (ctx && ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+  function beep(freq, ms, vol){
+    if (!sonido) return;
+    const c = audio(); if (!c) return;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = "square"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, c.currentTime);
+    g.gain.exponentialRampToValueAtTime(vol || 0.22, c.currentTime + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + ms/1000);
+    o.connect(g); g.connect(c.destination);
+    o.start(); o.stop(c.currentTime + ms/1000 + 0.02);
+  }
+  const beepCorto = () => beep(880, 130, 0.2);
+  function beepFase(tipo){
+    if (tipo === "work"){ beep(1320, 420, 0.28); }
+    else if (tipo === "fin"){ beep(660,200,.25); setTimeout(()=>beep(880,200,.25),220); setTimeout(()=>beep(1320,600,.3),440); }
+    else { beep(520, 380, 0.22); }
+  }
+
+  /* ====================== Pantalla encendida ====================== */
+  async function pedirWakeLock(){
+    if (!$("chkPantalla").checked || !("wakeLock" in navigator)) return;
+    try { wakeLock = await navigator.wakeLock.request("screen"); } catch(e){}
+  }
+  function soltarWakeLock(){ if (wakeLock){ try{ wakeLock.release(); }catch(e){} wakeLock = null; } }
+  document.addEventListener("visibilitychange", ()=>{ if (document.visibilityState === "visible" && corriendo) pedirWakeLock(); });
+
+  /* ====================== Config <-> UI ====================== */
+  function leerCfg(){
+    const c = {};
+    CAMPOS.forEach(k => {
+      const el = $(k);
+      let v = parseInt(el.value, 10);
+      if (isNaN(v)) v = parseInt(el.min, 10) || 0;
+      v = Math.max(parseInt(el.min,10), Math.min(parseInt(el.max,10), v));
+      el.value = v; c[k] = v;
+    });
+    return c;
+  }
+  function escribirCfg(c){ CAMPOS.forEach(k => { if (c[k] != null) $(k).value = c[k]; }); }
+
+  function fmt(seg){
+    seg = Math.max(0, Math.round(seg));
+    const m = Math.floor(seg/60), s = seg%60;
+    return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+  }
+  function fmtLargo(seg){
+    seg = Math.max(0, Math.round(seg));
+    const m = Math.floor(seg/60), s = seg%60;
+    return m > 0 ? (m + " min " + (s ? s + " s" : "")).trim() : s + " s";
+  }
+
+  function actualizarResumen(){
+    const c = leerCfg();
+    const p = construirPlan(c);
+    const total = duracionTotal(p);
+    const porSerie = c.rondas * c.trabajo + (c.rondas - 1) * c.descanso;
+    $("resumen").innerHTML =
+      "<b>" + c.series + "</b> serie(s) × <b>" + c.rondas + "</b> rondas de <b>" + c.trabajo + "s</b> trabajo / <b>" +
+      c.descanso + "s</b> descanso · " + (c.prep ? "prep " + c.prep + "s · " : "") +
+      "cada serie dura <b>" + fmtLargo(porSerie) + "</b> · total <b>" + fmtLargo(total) + "</b>";
+    if (!corriendo && idx === 0 && restante === 0) prepararVista(p);
+    guardarCfgLocal(c);
+  }
+
+  function guardarCfgLocal(c){
+    try{ localStorage.setItem(CLAVE_CFG, JSON.stringify({cfg:c, perfil:perfilActivoId, sonido:sonido})); }catch(e){}
+  }
+
+  /* ====================== Vista ====================== */
+  function pintarFase(tipo){
+    document.documentElement.style.setProperty("--fase", COLOR[tipo] || "var(--prep)");
+  }
+  function prepararVista(p){
+    plan = p; idx = 0; restante = p.length ? p[0].dur : 0;
+    pintarFase(p.length ? p[0].tipo : "prep");
+    render();
+    $("prox").innerHTML = p.length ? "Empieza con <b>" + TITULO[p[0].tipo] + "</b> · " + fmtLargo(duracionTotal(p)) + " en total" : "Configurá los tiempos";
+    $("fase").textContent = "Listo";
+    $("barra").style.width = "0%";
+  }
+  function render(){
+    const seg = plan[idx];
+    if (!seg){ return; }
+    $("reloj").textContent = fmt(restante);
+    $("fase").textContent = TITULO[seg.tipo];
+    const c = leerCfg();
+    $("chipRonda").textContent = seg.tipo === "prep" ? "–" : seg.ronda + "/" + c.rondas;
+    $("chipSerie").textContent = c.series > 1 ? seg.serie + "/" + c.series : "1/1";
+    let resto = restante;
+    for (let i = idx + 1; i < plan.length; i++) resto += plan[i].dur;
+    $("chipTotal").textContent = fmt(resto);
+    $("barra").style.width = (seg.dur ? (1 - restante/seg.dur) * 100 : 0) + "%";
+    const sig = plan[idx+1];
+    $("prox").innerHTML = sig
+      ? "Después: <b>" + TITULO[sig.tipo] + "</b> " + sig.dur + "s"
+      : "Última " + (seg.tipo === "work" ? "ronda" : "fase") + " 💪";
+    document.title = (corriendo ? fmt(restante) + " · " : "") + TITULO[seg.tipo] + " · Intervalos";
+  }
+
+  /* ====================== Motor ====================== */
+  function iniciar(){
+    if (!plan.length || idx >= plan.length){
+      const c = leerCfg();
+      plan = construirPlan(c); idx = 0; restante = plan[0].dur;
+    }
+    audio();
+    corriendo = true;
+    finAbs = Date.now() + restante * 1000;
+    ultimoBeep = -1;
+    document.body.classList.add("corriendo");
+    $("btnPlay").innerHTML = "⏸ Pausar";
+    pintarFase(plan[idx].tipo);
+    beepFase(plan[idx].tipo);
+    pedirWakeLock();
+    clearInterval(tick);
+    tick = setInterval(latido, 60);
+    render();
+  }
+  function pausar(){
+    corriendo = false;
+    clearInterval(tick); tick = null;
+    restante = Math.max(0, (finAbs - Date.now())/1000);
+    $("btnPlay").innerHTML = "▶ Seguir";
+    document.body.classList.remove("corriendo");
+    soltarWakeLock();
+    render();
+  }
+  function latido(){
+    restante = (finAbs - Date.now()) / 1000;
+    if (restante <= 3.02 && restante > 0){
+      const n = Math.ceil(restante);
+      if (n !== ultimoBeep && n <= 3){ ultimoBeep = n; beepCorto(); }
+    }
+    if (restante <= 0){
+      idx++;
+      if (idx >= plan.length){ terminar(); return; }
+      restante = plan[idx].dur;
+      finAbs = Date.now() + restante * 1000;
+      ultimoBeep = -1;
+      pintarFase(plan[idx].tipo);
+      beepFase(plan[idx].tipo);
+    }
+    render();
+  }
+  function terminar(){
+    clearInterval(tick); tick = null; corriendo = false;
+    document.body.classList.remove("corriendo");
+    pintarFase("fin");
+    $("fase").textContent = "¡Terminado!";
+    $("reloj").textContent = "00:00";
+    $("barra").style.width = "100%";
+    $("prox").innerHTML = "Sesión completa · " + fmtLargo(duracionTotal(plan));
+    $("chipTotal").textContent = "00:00";
+    $("btnPlay").innerHTML = "▶ Empezar";
+    document.title = "Intervalos · Tábata Air Bike";
+    beepFase("fin");
+    soltarWakeLock();
+    idx = plan.length; restante = 0;
+  }
+  function reiniciar(){
+    clearInterval(tick); tick = null; corriendo = false;
+    document.body.classList.remove("corriendo");
+    $("btnPlay").innerHTML = "▶ Empezar";
+    document.title = "Intervalos · Tábata Air Bike";
+    soltarWakeLock();
+    prepararVista(construirPlan(leerCfg()));
+  }
+  function saltar(){
+    if (!plan.length) return;
+    idx++;
+    if (idx >= plan.length){ terminar(); return; }
+    restante = plan[idx].dur;
+    finAbs = Date.now() + restante * 1000;
+    ultimoBeep = -1;
+    pintarFase(plan[idx].tipo);
+    if (corriendo) beepFase(plan[idx].tipo);
+    render();
+  }
+
+  /* ====================== Perfiles ====================== */
+  const PRECARGADOS = [
+    {id:"p1", nombre:"Tábata clásico Air Bike", notas:"20/10 × 8. All-out en cada intervalo, brazos y piernas. 4 minutos.",
+     prep:10, trabajo:20, descanso:10, rondas:8, series:1, descansoSerie:60},
+    {id:"p2", nombre:"Tábata doble (2 bloques)", notas:"Dos bloques de Tábata con 2 min de pausa. Segundo bloque solo piernas.",
+     prep:15, trabajo:20, descanso:10, rondas:8, series:2, descansoSerie:120},
+    {id:"p3", nombre:"Sprints 15/45", notas:"15 s máximos, 45 s de recuperación pedaleando suave. Potencia pura.",
+     prep:20, trabajo:15, descanso:45, rondas:10, series:1, descansoSerie:60},
+    {id:"p4", nombre:"Intervalos 30/30", notas:"30 s fuerte / 30 s suave. Ritmo sostenible, no all-out.",
+     prep:15, trabajo:30, descanso:30, rondas:12, series:1, descansoSerie:90}
+  ];
+
+  function cargarPerfiles(){
+    try{
+      const raw = localStorage.getItem(CLAVE);
+      if (raw){ const arr = JSON.parse(raw); if (Array.isArray(arr)) return arr; }
+    }catch(e){}
+    return PRECARGADOS.slice();
+  }
+  function guardarPerfiles(){
+    try{ localStorage.setItem(CLAVE, JSON.stringify(perfiles)); }
+    catch(e){ aviso("No se pudieron guardar los perfiles en este navegador"); }
+  }
+  function nuevoId(){ return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+
+  function listarPerfiles(){
+    const cont = $("listaPerfiles");
+    cont.innerHTML = "";
+    if (!perfiles.length){ cont.innerHTML = '<div class="vacio">Todavía no guardaste ningún perfil.</div>'; return; }
+    perfiles.forEach(p => {
+      const div = document.createElement("div");
+      div.className = "perfil-item" + (p.id === perfilActivoId ? " activo" : "");
+      const total = duracionTotal(construirPlan(p));
+      div.innerHTML =
+        '<div class="perfil-info">' +
+          '<div class="perfil-nom">' + esc(p.nombre) + '</div>' +
+          '<div class="perfil-det">' + p.trabajo + 's / ' + p.descanso + 's · ' + p.rondas + ' rondas' +
+            (p.series > 1 ? ' · ' + p.series + ' series' : '') + ' · ' + fmtLargo(total) + '</div>' +
+          (p.notas ? '<div class="perfil-nota">' + esc(p.notas) + '</div>' : '') +
+        '</div>' +
+        '<span style="color:var(--muted);font-size:13px">cargar →</span>';
+      div.addEventListener("click", () => usarPerfil(p.id));
+      cont.appendChild(div);
+    });
+  }
+  function esc(s){ return String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+
+  function usarPerfil(id){
+    const p = perfiles.find(x => x.id === id);
+    if (!p) return;
+    perfilActivoId = id;
+    escribirCfg(p);
+    $("nombrePerfil").value = p.nombre || "";
+    $("notasPerfil").value = p.notas || "";
+    $("perfilActivo").textContent = p.nombre;
+    reiniciar();
+    listarPerfiles();
+    actualizarResumen();
+    aviso("Perfil cargado: " + p.nombre);
+  }
+
+  function guardarCambios(){
+    const nombre = $("nombrePerfil").value.trim();
+    if (!nombre){ aviso("Poné un nombre al perfil"); $("nombrePerfil").focus(); return; }
+    const p = perfiles.find(x => x.id === perfilActivoId);
+    if (!p){ guardarNuevo(); return; }
+    Object.assign(p, leerCfg(), {nombre:nombre, notas:$("notasPerfil").value.trim()});
+    guardarPerfiles(); listarPerfiles();
+    $("perfilActivo").textContent = nombre;
+    aviso("Perfil actualizado");
+  }
+  function guardarNuevo(){
+    const nombre = $("nombrePerfil").value.trim();
+    if (!nombre){ aviso("Poné un nombre al perfil"); $("nombrePerfil").focus(); return; }
+    const p = Object.assign({id:nuevoId(), nombre:nombre, notas:$("notasPerfil").value.trim()}, leerCfg());
+    perfiles.push(p); perfilActivoId = p.id;
+    guardarPerfiles(); listarPerfiles();
+    $("perfilActivo").textContent = nombre;
+    aviso("Perfil guardado");
+  }
+  function borrarPerfil(){
+    const p = perfiles.find(x => x.id === perfilActivoId);
+    if (!p){ aviso("No hay ningún perfil seleccionado"); return; }
+    if (!confirm('¿Borrar el perfil "' + p.nombre + '"?')) return;
+    perfiles = perfiles.filter(x => x.id !== perfilActivoId);
+    perfilActivoId = null;
+    $("perfilActivo").textContent = "Protocolo Tábata configurable";
+    guardarPerfiles(); listarPerfiles();
+    aviso("Perfil borrado");
+  }
+
+  function exportar(){
+    const blob = new Blob([JSON.stringify({app:"intervalos-airbike", version:1, perfiles:perfiles}, null, 2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "perfiles-intervalos.json";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 3000);
+  }
+  function importar(file){
+    const fr = new FileReader();
+    fr.onload = () => {
+      try{
+        const data = JSON.parse(fr.result);
+        const arr = Array.isArray(data) ? data : data.perfiles;
+        if (!Array.isArray(arr)) throw new Error("formato");
+        arr.forEach(p => {
+          if (!p || !p.nombre) return;
+          const limpio = {
+            id: nuevoId(), nombre: String(p.nombre).slice(0,60), notas: String(p.notas||"").slice(0,300),
+            prep:+p.prep||0, trabajo:+p.trabajo||20, descanso:+p.descanso||10,
+            rondas:+p.rondas||8, series:+p.series||1, descansoSerie:+p.descansoSerie||60
+          };
+          if (!perfiles.some(x => x.nombre === limpio.nombre)) perfiles.push(limpio);
+        });
+        guardarPerfiles(); listarPerfiles();
+        aviso("Respaldo importado");
+      }catch(e){ aviso("El archivo no es un respaldo válido"); }
+    };
+    fr.readAsText(file);
+  }
+
+  let msgT = null;
+  function aviso(txt){
+    const m = $("msg"); m.textContent = txt; m.classList.add("ver");
+    clearTimeout(msgT); msgT = setTimeout(()=>m.classList.remove("ver"), 2200);
+  }
+
+  /* ====================== Eventos ====================== */
+  $("btnPlay").addEventListener("click", () => {
+    if (corriendo) pausar();
+    else { if (idx >= plan.length) reiniciar(); iniciar(); }
+  });
+  $("btnReset").addEventListener("click", reiniciar);
+  $("btnSaltar").addEventListener("click", saltar);
+
+  document.querySelectorAll("[data-step]").forEach(b => {
+    b.addEventListener("click", () => {
+      const el = $(b.dataset.target);
+      const paso = parseInt(b.dataset.step, 10);
+      let v = (parseInt(el.value,10) || 0) + paso;
+      v = Math.max(parseInt(el.min,10), Math.min(parseInt(el.max,10), v));
+      el.value = v;
+      if (!corriendo) reiniciar();
+      actualizarResumen();
+    });
+  });
+  CAMPOS.forEach(k => $(k).addEventListener("change", () => { if (!corriendo) reiniciar(); actualizarResumen(); }));
+
+  $("btnGuardar").addEventListener("click", guardarCambios);
+  $("btnNuevo").addEventListener("click", guardarNuevo);
+  $("btnBorrar").addEventListener("click", borrarPerfil);
+  $("btnExportar").addEventListener("click", exportar);
+  $("btnImportar").addEventListener("click", () => $("fileImport").click());
+  $("fileImport").addEventListener("change", e => { if (e.target.files[0]) importar(e.target.files[0]); e.target.value = ""; });
+
+  $("btnSonido").addEventListener("click", () => {
+    sonido = !sonido;
+    $("btnSonido").innerHTML = sonido ? "🔊 Sonido" : "🔇 Silencio";
+    if (sonido) beepCorto();
+    guardarCfgLocal(leerCfg());
+  });
+
+  document.addEventListener("keydown", e => {
+    if (/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (e.code === "Space"){ e.preventDefault(); $("btnPlay").click(); }
+    else if (e.key === "r" || e.key === "R") reiniciar();
+    else if (e.key === "s" || e.key === "S") saltar();
+  });
+
+  /* ====================== Arranque ====================== */
+  perfiles = cargarPerfiles();
+  guardarPerfiles();
+  try{
+    const st = JSON.parse(localStorage.getItem(CLAVE_CFG) || "null");
+    if (st && st.cfg) escribirCfg(st.cfg);
+    if (st && typeof st.sonido === "boolean"){ sonido = st.sonido; $("btnSonido").innerHTML = sonido ? "🔊 Sonido" : "🔇 Silencio"; }
+    if (st && st.perfil){
+      const p = perfiles.find(x => x.id === st.perfil);
+      if (p){ perfilActivoId = p.id; $("nombrePerfil").value = p.nombre; $("notasPerfil").value = p.notas || ""; $("perfilActivo").textContent = p.nombre; }
+    }
+  }catch(e){}
+  listarPerfiles();
+  actualizarResumen();
+  reiniciar();
+
+  window.__intervalos = { construirPlan, duracionTotal };
+
+  /* ====================== Instalación / offline (PWA) ====================== */
+  let promptInstalar = null;
+  window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault();
+    promptInstalar = e;
+    $("btnInstalar").classList.remove("oculto");
+  });
+  $("btnInstalar").addEventListener("click", async () => {
+    if (!promptInstalar) return;
+    promptInstalar.prompt();
+    await promptInstalar.userChoice;
+    promptInstalar = null;
+    $("btnInstalar").classList.add("oculto");
+  });
+  window.addEventListener("appinstalled", () => {
+    $("btnInstalar").classList.add("oculto");
+    aviso("Instalada en tu pantalla de inicio");
+  });
+
+  if ("serviceWorker" in navigator && location.protocol.startsWith("http")){
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(()=>{});
+    });
+  }
+})();
+</script>
+</body>
+</html>
